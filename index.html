@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎮 游戏合集</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <!-- 游戏大厅 -->
+    <div id="lobby">
+        <header>
+            <h1>🎮 游戏合集</h1>
+            <p>选择一个游戏开始玩吧！</p>
+        </header>
+        <div class="game-grid" id="gameGrid">
+            <div class="game-card" data-game="snake">
+                <div class="card-icon">🐍</div>
+                <div class="card-title">贪吃蛇</div>
+                <div class="card-desc">经典贪吃蛇，吃越多越长</div>
+            </div>
+            <div class="game-card" data-game="breakout">
+                <div class="card-icon">🧱</div>
+                <div class="card-title">打砖块</div>
+                <div class="card-desc">反弹小球，消除所有砖块</div>
+            </div>
+            <div class="game-card" data-game="shooter">
+                <div class="card-icon">🚀</div>
+                <div class="card-title">飞机射击</div>
+                <div class="card-desc">消灭敌军，挑战高分</div>
+            </div>
+            <div class="game-card" data-game="game2048">
+                <div class="card-icon">🔢</div>
+                <div class="card-title">2048</div>
+                <div class="card-desc">合并数字，冲击2048</div>
+            </div>
+            <div class="game-card" data-game="minesweeper">
+                <div class="card-icon">💣</div>
+                <div class="card-title">扫雷</div>
+                <div class="card-desc">经典扫雷，考验逻辑</div>
+            </div>
+            <div class="game-card" data-game="pong">
+                <div class="card-icon">🏓</div>
+                <div class="card-title">乒乓球</div>
+                <div class="card-desc">与AI对战乒乓球</div>
+            </div>
+            <div class="game-card" data-game="whackamole">
+                <div class="card-icon">🎯</div>
+                <div class="card-title">打地鼠</div>
+                <div class="card-desc">眼疾手快，打地鼠！</div>
+            </div>
+            <div class="game-card" data-game="runner">
+                <div class="card-icon">🏃</div>
+                <div class="card-title">跑酷</div>
+                <div class="card-desc">无限奔跑，躲避障碍</div>
+            </div>
+            <div class="game-card" data-game="tetris">
+                <div class="card-icon">🧩</div>
+                <div class="card-title">俄罗斯方块</div>
+                <div class="card-desc">经典下落拼图</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 游戏容器 -->
+    <div id="gameContainer" style="display:none;">
+        <div id="gameHeader">
+            <button id="backBtn" onclick="gamesManager.backToLobby()">← 返回大厅</button>
+            <span id="gameTitle"></span>
+            <span id="gameScore">得分: 0</span>
+        </div>
+        <div id="gameContent">
+            <canvas id="gameCanvas"></canvas>
+        </div>
+        <div id="gameControls">
+            <div id="mobileControls"></div>
+        </div>
+    </div>
+
+    <script src="js/games.js"></script>
+    <script src="js/snake.js"></script>
+    <script src="js/breakout.js"></script>
+    <script src="js/shooter.js"></script>
+    <script src="js/2048.js"></script>
+    <script src="js/minesweeper.js"></script>
+    <script src="js/pong.js"></script>
+    <script src="js/whackamole.js"></script>
+    <script src="js/tetris.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="js/runner.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

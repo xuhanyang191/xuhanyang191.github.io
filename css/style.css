@@ -1,0 +1,248 @@
+/* ========== 全局 ========== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+    min-height: 100vh;
+    color: #fff;
+    overflow-x: hidden;
+}
+
+/* ========== 游戏大厅 ========== */
+#lobby {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+#lobby header h1 {
+    font-size: 3rem;
+    margin-bottom: 8px;
+    background: linear-gradient(to right, #f7971e, #ffd200);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+}
+
+#lobby header p {
+    color: #aaa;
+    font-size: 1.1rem;
+    margin-bottom: 40px;
+}
+
+.game-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 20px;
+    padding: 0;
+}
+
+.game-card {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 28px 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    backdrop-filter: blur(6px);
+}
+
+.game-card:hover {
+    background: rgba(255,255,255,0.12);
+    transform: translateY(-6px);
+    border-color: rgba(255,255,255,0.25);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+}
+
+.game-card:active {
+    transform: translateY(-2px);
+}
+
+.card-icon {
+    font-size: 3.2rem;
+    margin-bottom: 12px;
+}
+
+.card-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.card-desc {
+    font-size: 0.8rem;
+    color: #999;
+    line-height: 1.4;
+}
+
+/* ========== 游戏容器 ========== */
+#gameContainer {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 16px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#gameHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+#gameTitle {
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+#gameScore {
+    font-size: 1rem;
+    color: #ffd200;
+    font-weight: 600;
+    min-width: 100px;
+    text-align: right;
+}
+
+#backBtn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+#backBtn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+#gameContent {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+}
+
+#gameCanvas {
+    border: 2px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    background: #1a1a2e;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* ========== 移动端控制 ========== */
+#gameControls {
+    flex-shrink: 0;
+    padding: 12px 0;
+}
+
+#mobileControls {
+    display: none;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.mobile-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.08);
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+}
+
+.mobile-btn:active {
+    background: rgba(255,255,255,0.2);
+}
+
+/* 游戏结束覆盖层 */
+.game-overlay {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+}
+
+.game-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.game-overlay h2 {
+    font-size: 2rem;
+    margin-bottom: 8px;
+}
+
+.game-overlay p {
+    color: #ccc;
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+}
+
+.game-overlay button {
+    background: #ffd200;
+    color: #1a1a2e;
+    border: none;
+    padding: 12px 32px;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.game-overlay button:hover {
+    transform: scale(1.05);
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 600px) {
+    #lobby header h1 { font-size: 2rem; }
+    .game-grid { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .game-card { padding: 20px 10px; }
+    .card-icon { font-size: 2.4rem; }
+    #mobileControls { display: flex; }
+    #gameHeader { flex-wrap: wrap; justify-content: center; text-align: center; }
+    #gameScore { min-width: auto; }
+}
+
+/* 高分闪烁 */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+.high-score {
+    animation: pulse 1s ease-in-out infinite;
+}

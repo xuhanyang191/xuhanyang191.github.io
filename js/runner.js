@@ -847,6 +847,12 @@ class RunnerGame {
             return;
         }
 
+        if (gamesManager.checkPause()) {
+            if (this.renderer && this.scene && this.camera) this.renderer.render(this.scene, this.camera);
+            gamesManager.animationId = requestAnimationFrame((t) => this.loop(t));
+            return;
+        }
+
         this.update(delta);
         this.drawParticles();
 

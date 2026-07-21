@@ -233,6 +233,7 @@ class PongGame {
     loop(timestamp) {
         if (!this.running && this.gameOver) return;
         if (!this.running) return;
+        if (gamesManager.checkPause()) { gamesManager.animationId = requestAnimationFrame((t) => this.loop(t)); return; }
 
         this.update();
         this.draw();

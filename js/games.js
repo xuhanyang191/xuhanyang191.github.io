@@ -20,6 +20,9 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
     };
 }
 
+// 获取默认玩家名
+function getDefaultName() { try { return localStorage.getItem('playerName') || '玩家'; } catch { return '玩家'; } }
+
 class GamesManager {
     constructor() {
         this.currentGame = null;
@@ -31,9 +34,13 @@ class GamesManager {
         this.leaderboards = this.loadLeaderboards();
         this.animationId = null;
         this.isRunning = false;
+        this.paused = false;
+        this.playerName = getDefaultName();
 
         this.buildOverlay();
         this.buildLeaderboardModal();
+        this.buildPauseOverlay();
+        this.addGlobalKeys();
     }
 
     // ======================== 排行榜存储 ========================
@@ -54,7 +61,9 @@ class GamesManager {
         if (score <= 0) return null;
         const key = gameId;
         if (!this.leaderboards[key]) this.leaderboards[key] = [];
+        const name = this.playerName || '匿名';
         const entry = {
+            name: name,
             score: Math.floor(score),
             date: new Date().toLocaleDateString('zh-CN'),
             time: Date.now()
@@ -81,18 +90,86 @@ class GamesManager {
         this.overlay.className = 'game-overlay';
         this.overlay.id = 'gameOverlay';
         this.overlay.innerHTML = `
-            <div style="text-align:center;padding:10px;max-width:320px;width:90%;">
+            <div style="text-align:center;padding:10px;max-width:340px;width:90%;">
                 <h2 id="overlayTitle" style="margin-bottom:6px;">游戏结束</h2>
-                <p id="overlayDesc" style="margin-bottom:10px;font-size:1rem;"></p>
-                <div id="leaderboardMini" style="text-align:left;margin:6px auto;max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:6px 10px;"></div>
-                <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
-                    <button onclick="gamesManager.restartGame()" style="background:#ffd200;color:#1a1a2e;border:none;padding:10px 24px;border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;">🔄 再来一局</button>
-                    <button onclick="gamesManager.leaderboardModalShow()" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 18px;border-radius:8px;font-size:0.95rem;cursor:pointer;">🏆 排行榜</button>
-                    <button onclick="gamesManager.backToLobby()" style="background:rgba(255,255,255,0.05);color:#aaa;border:1px solid rgba(255,255,255,0.1);padding:10px 18px;border-radius:8px;font-size:0.95rem;cursor:pointer;">🏠 返回</button>
+                <p id="overlayDesc" style="margin-bottom:6px;font-size:1rem;"></p>
+                <div id="nameInputArea" style="margin:6px auto;">
+                    <input id="playerNameInput" type="text" maxlength="8" placeholder="输入昵称..." value="${this.playerName}"
+                        style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 12px;color:#fff;font-size:0.9rem;text-align:center;width:150px;outline:none;">
                 </div>
+                <div id="leaderboardMini" style="text-align:left;margin:6px auto;max-height:180px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:6px 10px;"></div>
+                <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap;">
+                    <button onclick="gamesManager.restartGame()" style="background:#ffd200;color:#1a1a2e;border:none;padding:10px 20px;border-radius:8px;font-size:0.9rem;font-weight:600;cursor:pointer;">🔄 再来一局</button>
+                    <button onclick="gamesManager.leaderboardModalShow()" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 16px;border-radius:8px;font-size:0.9rem;cursor:pointer;">🏆 排行榜</button>
+                    <button onclick="gamesManager.backToLobby()" style="background:rgba(255,255,255,0.05);color:#aaa;border:1px solid rgba(255,255,255,0.1);padding:10px 16px;border-radius:8px;font-size:0.9rem;cursor:pointer;">🏠 返回</button>
+                </div>
+                <div style="margin-top:6px;color:rgba(255,255,255,0.25);font-size:0.7rem;">P 暂停 · R 重置</div>
             </div>
         `;
         document.getElementById('gameContent').appendChild(this.overlay);
+
+        // 昵称输入自动保存
+        this.overlay.addEventListener('input', (e) => {
+            if (e.target.id === 'playerNameInput') {
+                this.playerName = e.target.value || '玩家';
+                try { localStorage.setItem('playerName', this.playerName); } catch {}
+            }
+        });
+    }
+
+    buildPauseOverlay() {
+        this.pauseOverlay = document.createElement('div');
+        this.pauseOverlay.id = 'pauseOverlay';
+        this.pauseOverlay.style.cssText = `
+            position:absolute;top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.6);display:none;
+            align-items:center;justify-content:center;
+            border-radius:12px;z-index:15;
+            backdrop-filter:blur(4px);
+        `;
+        this.pauseOverlay.innerHTML = `
+            <div style="text-align:center;">
+                <div style="font-size:3rem;margin-bottom:8px;">⏸</div>
+                <div style="font-size:1.2rem;color:#fff;">已暂停</div>
+                <div style="font-size:0.8rem;color:rgba(255,255,255,0.4);margin-top:6px;">按 P 或 空格 继续</div>
+            </div>
+        `;
+        document.getElementById('gameContent').appendChild(this.pauseOverlay);
+    }
+
+    addGlobalKeys() {
+        this._globalKeyHandler = (e) => {
+            // R = 重置
+            if (e.key === 'r' || e.key === 'R') {
+                if (this.currentGame) {
+                    e.preventDefault();
+                    this.restartGame();
+                    return;
+                }
+            }
+            // P = 暂停 (仅对使用 Canvas 循环的游戏有效)
+            if (e.key === 'p' || e.key === 'P' || e.key === ' ') {
+                if (this.currentGame && this.isRunning) {
+                    // 空格: 只对 snake/breakout/pong/minesweeper/2048 等不用空格的游戏暂停
+                    const noSpaceGames = ['snake', 'breakout', 'pong', 'minesweeper', 'game2048', 'whackamole'];
+                    if (e.key === ' ' && !noSpaceGames.includes(this.currentGame)) return;
+                    e.preventDefault();
+                    this.togglePause();
+                }
+            }
+        };
+        window.addEventListener('keydown', this._globalKeyHandler);
+    }
+
+    togglePause() {
+        this.paused = !this.paused;
+        this.pauseOverlay.style.display = this.paused ? 'flex' : 'none';
+    }
+
+    // 游戏循环助手 - 每次循环前检查暂停
+    checkPause() {
+        if (this.paused) return true;
+        return false;
     }
 
     buildLeaderboardModal() {
@@ -145,10 +222,11 @@ class GamesManager {
             const medal = rank <= 3 ? medals[rank - 1] : `#${rank}`;
             const isBest = rank === 1;
             return `
-                <div style="display:flex;align-items:center;padding:6px 8px;margin:3px 0;border-radius:6px;background:${isBest ? 'rgba(255,210,0,0.1)' : 'rgba(255,255,255,0.03)'};${isBest ? 'border:1px solid rgba(255,210,0,0.2)' : ''}">
-                    <span style="width:36px;font-size:0.9rem;text-align:center;">${medal}</span>
-                    <span style="flex:1;font-weight:${isBest ? 'bold' : 'normal'};font-size:1rem;">${e.score.toLocaleString()}</span>
-                    <span style="color:#888;font-size:0.75rem;">${e.date || ''}</span>
+                <div style="display:flex;align-items:center;padding:5px 8px;margin:2px 0;border-radius:6px;background:${isBest ? 'rgba(255,210,0,0.1)' : 'rgba(255,255,255,0.03)'};${isBest ? 'border:1px solid rgba(255,210,0,0.15)' : ''}">
+                    <span style="width:32px;font-size:0.85rem;text-align:center;">${medal}</span>
+                    <span style="width:60px;font-weight:${isBest ? 'bold' : 'normal'};font-size:0.85rem;color:#ddd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.name || '匿名'}</span>
+                    <span style="flex:1;font-weight:${isBest ? 'bold' : 'normal'};font-size:0.95rem;text-align:right;">${e.score.toLocaleString()}</span>
+                    <span style="color:#666;font-size:0.65rem;margin-left:6px;">${e.date || ''}</span>
                 </div>
             `;
         }).join('');
@@ -222,6 +300,8 @@ class GamesManager {
             window.removeEventListener('resize', this._resizeHandler);
             this._resizeHandler = null;
         }
+        this.paused = false;
+        if (this.pauseOverlay) this.pauseOverlay.style.display = 'none';
         this.leaderboardModalHide();
         document.getElementById('lobby').style.display = 'block';
         document.getElementById('gameContainer').style.display = 'none';
@@ -232,6 +312,8 @@ class GamesManager {
     restartGame() {
         if (!this.gameInstance) return;
         this.hideOverlay();
+        this.paused = false;
+        if (this.pauseOverlay) this.pauseOverlay.style.display = 'none';
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;

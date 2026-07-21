@@ -316,6 +316,7 @@ class TetrisGame {
     loop(timestamp) {
         if (!this.running && this.gameOver) return;
         if (!this.running) return;
+        if (gamesManager.checkPause()) { gamesManager.animationId = requestAnimationFrame((t) => this.loop(t)); return; }
 
         if (!this.lastDrop) this.lastDrop = timestamp;
         const delta = timestamp - this.lastDrop;

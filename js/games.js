@@ -1,8 +1,8 @@
 /**
- * 游戏管理器 - 处理游戏切换、画布管理、得分和游戏状态
+ * 游戏管理器 - 排行榜 + 画布管理 + 游戏状态
  */
 
-// roundRect 兼容补丁（某些浏览器不支持）
+// roundRect 兼容补丁
 if (!CanvasRenderingContext2D.prototype.roundRect) {
     CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
         if (r > w / 2) r = w / 2;
@@ -28,40 +28,137 @@ class GamesManager {
         this.gameTitle = document.getElementById('gameTitle');
         this.gameScore = document.getElementById('gameScore');
         this.score = 0;
-        this.highScores = this.loadHighScores();
+        this.leaderboards = this.loadLeaderboards();
         this.animationId = null;
         this.isRunning = false;
 
-        // 游戏结束覆盖层
+        this.buildOverlay();
+        this.buildLeaderboardModal();
+    }
+
+    // ======================== 排行榜存储 ========================
+
+    loadLeaderboards() {
+        try {
+            return JSON.parse(localStorage.getItem('gameLeaderboards_v2')) || {};
+        } catch { return {}; }
+    }
+
+    saveLeaderboards() {
+        try {
+            localStorage.setItem('gameLeaderboards_v2', JSON.stringify(this.leaderboards));
+        } catch {}
+    }
+
+    addScore(gameId, score) {
+        if (score <= 0) return null;
+        const key = gameId;
+        if (!this.leaderboards[key]) this.leaderboards[key] = [];
+        const entry = {
+            score: Math.floor(score),
+            date: new Date().toLocaleDateString('zh-CN'),
+            time: Date.now()
+        };
+        this.leaderboards[key].push(entry);
+        this.leaderboards[key].sort((a, b) => b.score - a.score);
+        this.leaderboards[key] = this.leaderboards[key].slice(0, 10);
+        this.saveLeaderboards();
+
+        // 判断是不是新纪录（最高分）
+        const isNewRecord = entry.score === this.leaderboards[key][0].score &&
+                            entry.time === this.leaderboards[key][0].time;
+        return { entry, rank: this.leaderboards[key].indexOf(entry) + 1, isNewRecord };
+    }
+
+    getLeaderboard(gameId) {
+        return this.leaderboards[gameId] || [];
+    }
+
+    // ======================== UI ========================
+
+    buildOverlay() {
         this.overlay = document.createElement('div');
         this.overlay.className = 'game-overlay';
+        this.overlay.id = 'gameOverlay';
         this.overlay.innerHTML = `
-            <h2 id="overlayTitle">游戏结束</h2>
-            <p id="overlayDesc">得分: 0</p>
-            <button onclick="gamesManager.restartGame()">🔄 再来一局</button>
+            <div style="text-align:center;padding:10px;max-width:320px;width:90%;">
+                <h2 id="overlayTitle" style="margin-bottom:6px;">游戏结束</h2>
+                <p id="overlayDesc" style="margin-bottom:10px;font-size:1rem;"></p>
+                <div id="leaderboardMini" style="text-align:left;margin:6px auto;max-height:200px;overflow-y:auto;background:rgba(0,0,0,0.3);border-radius:8px;padding:6px 10px;"></div>
+                <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap;">
+                    <button onclick="gamesManager.restartGame()" style="background:#ffd200;color:#1a1a2e;border:none;padding:10px 24px;border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;">🔄 再来一局</button>
+                    <button onclick="gamesManager.leaderboardModalShow()" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:10px 18px;border-radius:8px;font-size:0.95rem;cursor:pointer;">🏆 排行榜</button>
+                    <button onclick="gamesManager.backToLobby()" style="background:rgba(255,255,255,0.05);color:#aaa;border:1px solid rgba(255,255,255,0.1);padding:10px 18px;border-radius:8px;font-size:0.95rem;cursor:pointer;">🏠 返回</button>
+                </div>
+            </div>
         `;
         document.getElementById('gameContent').appendChild(this.overlay);
     }
 
-    loadHighScores() {
-        try {
-            return JSON.parse(localStorage.getItem('gameHighScores')) || {};
-        } catch { return {}; }
+    buildLeaderboardModal() {
+        this.lbModal = document.createElement('div');
+        this.lbModal.id = 'lbModal';
+        this.lbModal.style.cssText = `
+            position:fixed;top:0;left:0;right:0;bottom:0;
+            background:rgba(0,0,0,0.8);z-index:100;
+            display:none;align-items:center;justify-content:center;
+            backdrop-filter:blur(6px);
+        `;
+        this.lbModal.innerHTML = `
+            <div style="background:#1a1a2e;border:1px solid rgba(255,255,255,0.15);border-radius:16px;padding:24px;max-width:380px;width:90%;max-height:80vh;overflow-y:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <span style="font-size:1.3rem;font-weight:bold;">🏆 排行榜</span>
+                    <span id="lbGameTitle" style="color:#aaa;font-size:0.9rem;"></span>
+                </div>
+                <div id="lbList"></div>
+                <div style="text-align:center;margin-top:16px;">
+                    <button onclick="gamesManager.leaderboardModalHide()" style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);padding:8px 28px;border-radius:8px;cursor:pointer;">关闭</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(this.lbModal);
     }
 
-    saveHighScores() {
-        try {
-            localStorage.setItem('gameHighScores', JSON.stringify(this.highScores));
-        } catch {}
+    leaderboardModalShow() {
+        const title = this.gameTitle.textContent || '游戏';
+        document.getElementById('lbGameTitle').textContent = title;
+        this.renderLeaderboardList(document.getElementById('lbList'), this.currentGame, true);
+        this.lbModal.style.display = 'flex';
     }
 
-    getHighScore(gameId) {
-        return this.highScores[gameId] || 0;
+    leaderboardModalHide() {
+        this.lbModal.style.display = 'none';
     }
+
+    renderLeaderboardList(container, gameId, showAll) {
+        const entries = this.getLeaderboard(gameId);
+        const medals = ['🥇', '🥈', '🥉'];
+
+        if (entries.length === 0) {
+            container.innerHTML = '<div style="text-align:center;color:#666;padding:20px;">暂无记录</div>';
+            return;
+        }
+
+        const display = showAll ? entries : entries.slice(0, 5);
+        container.innerHTML = display.map((e, i) => {
+            const rank = i + 1;
+            const medal = rank <= 3 ? medals[rank - 1] : `#${rank}`;
+            const isBest = rank === 1;
+            return `
+                <div style="display:flex;align-items:center;padding:6px 8px;margin:3px 0;border-radius:6px;background:${isBest ? 'rgba(255,210,0,0.1)' : 'rgba(255,255,255,0.03)'};${isBest ? 'border:1px solid rgba(255,210,0,0.2)' : ''}">
+                    <span style="width:36px;font-size:0.9rem;text-align:center;">${medal}</span>
+                    <span style="flex:1;font-weight:${isBest ? 'bold' : 'normal'};font-size:1rem;">${e.score.toLocaleString()}</span>
+                    <span style="color:#888;font-size:0.75rem;">${e.date || ''}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // ======================== 游戏流程 ========================
 
     updateScore(score) {
         this.score = score;
-        this.gameScore.textContent = `得分: ${score}`;
+        this.gameScore.textContent = `得分: ${Math.floor(score)}`;
     }
 
     showOverlay(title, desc) {
@@ -78,8 +175,8 @@ class GamesManager {
         const container = document.getElementById('gameContent');
         const rect = container.getBoundingClientRect();
         const size = Math.min(rect.width - 20, rect.height - 20, 600);
-        this.canvas.width = size;
-        this.canvas.height = size;
+        this.canvas.width = Math.max(100, size);
+        this.canvas.height = Math.max(100, size);
     }
 
     startGame(gameId, gameInstance) {
@@ -88,39 +185,26 @@ class GamesManager {
         this.hideOverlay();
         this.updateScore(0);
 
-        // 游戏标题
         const titles = {
-            snake: '🐍 贪吃蛇',
-            breakout: '🧱 打砖块',
-            shooter: '🚀 飞机射击',
-            game2048: '🔢 2048',
-            minesweeper: '💣 扫雷',
-            pong: '🏓 乒乓球',
-            whackamole: '🎯 打地鼠',
-            tetris: '🧩 俄罗斯方块',
-            runner: '🏃 跑酷'
+            snake: '🐍 贪吃蛇', breakout: '🧱 打砖块', shooter: '🚀 飞机射击',
+            game2048: '🔢 2048', minesweeper: '💣 扫雷', pong: '🏓 乒乓球',
+            whackamole: '🎯 打地鼠', tetris: '🧩 俄罗斯方块', runner: '🏃 跑酷'
         };
         this.gameTitle.textContent = titles[gameId] || '游戏';
 
-        // 设置移动端控制
         this.setupMobileControls(gameId);
 
-        // 切换显示（必须在 resizeCanvas 之前）
         document.getElementById('lobby').style.display = 'none';
         document.getElementById('gameContainer').style.display = 'flex';
 
-        // 等待布局稳定后初始化画布和游戏
         setTimeout(() => {
             this.resizeCanvas();
             this.isRunning = true;
             gameInstance.start(this.canvas, this.ctx);
         }, 50);
 
-        // 注册窗口缩放事件
         this._resizeHandler = () => {
-            if (this.currentGame && this.gameInstance) {
-                this.resizeCanvas();
-            }
+            if (this.currentGame && this.gameInstance) this.resizeCanvas();
         };
         window.addEventListener('resize', this._resizeHandler);
     }
@@ -134,11 +218,11 @@ class GamesManager {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
         }
-        // 移除窗口缩放事件
         if (this._resizeHandler) {
             window.removeEventListener('resize', this._resizeHandler);
             this._resizeHandler = null;
         }
+        this.leaderboardModalHide();
         document.getElementById('lobby').style.display = 'block';
         document.getElementById('gameContainer').style.display = 'none';
         this.currentGame = null;
@@ -148,7 +232,6 @@ class GamesManager {
     restartGame() {
         if (!this.gameInstance) return;
         this.hideOverlay();
-        // 取消旧动画帧，防止与新帧冲突
         if (this.animationId) {
             cancelAnimationFrame(this.animationId);
             this.animationId = null;
@@ -159,146 +242,68 @@ class GamesManager {
 
     gameOver() {
         this.isRunning = false;
-        const hs = this.getHighScore(this.currentGame);
-        const isNew = this.score > hs;
-        if (isNew && this.score > 0) {
-            this.highScores[this.currentGame] = this.score;
-            this.saveHighScores();
-        }
-        const title = isNew ? '🎉 新纪录！' : '💫 游戏结束';
-        const desc = `得分: ${this.score} ${isNew ? '🏆 新纪录！' : `最高分: ${hs}`}`;
+
+        // 保存到排行榜
+        const result = this.addScore(this.currentGame, this.score);
+
+        const title = result?.isNewRecord ? '🎉 新纪录！' : '💫 游戏结束';
+        const best = this.getLeaderboard(this.currentGame);
+        const hs = best.length > 0 ? best[0].score : 0;
+        const desc = result?.isNewRecord
+            ? `得分: ${Math.floor(this.score)}  🏆 新纪录！`
+            : `得分: ${Math.floor(this.score)}  👑 最高: ${hs}`;
         this.showOverlay(title, desc);
+
+        // 渲染迷你排行榜
+        const miniContainer = document.getElementById('leaderboardMini');
+        this.renderLeaderboardList(miniContainer, this.currentGame, false);
     }
+
+    // ======================== 移动端控制 ========================
 
     setupMobileControls(gameId) {
         const container = document.getElementById('mobileControls');
-        // 默认隐藏
         container.style.display = 'none';
         container.innerHTML = '';
 
         if (gameId === 'snake') {
             container.style.display = 'flex';
-            container.innerHTML = `
-                <div style="display:grid;grid-template-columns:64px 64px 64px;gap:4px">
-                    <div></div>
-                    <button class="mobile-btn" data-dir="up">↑</button>
-                    <div></div>
-                    <button class="mobile-btn" data-dir="left">←</button>
-                    <button class="mobile-btn" data-dir="down">↓</button>
-                    <button class="mobile-btn" data-dir="right">→</button>
-                </div>
-            `;
-            container.querySelectorAll('.mobile-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput(btn.dataset.dir);
-                    }
-                });
-            });
+            container.innerHTML = `<div style="display:grid;grid-template-columns:64px 64px 64px;gap:4px"><div></div><button class="mobile-btn" data-dir="up">↑</button><div></div><button class="mobile-btn" data-dir="left">←</button><button class="mobile-btn" data-dir="down">↓</button><button class="mobile-btn" data-dir="right">→</button></div>`;
+            container.querySelectorAll('.mobile-btn').forEach(btn => btn.addEventListener('click', () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); }));
         } else if (gameId === 'breakout' || gameId === 'pong') {
             container.style.display = 'flex';
-            container.innerHTML = `
-                <button class="mobile-btn" data-dir="left">←</button>
-                <button class="mobile-btn" data-dir="right">→</button>
-            `;
+            container.innerHTML = `<button class="mobile-btn" data-dir="left">←</button><button class="mobile-btn" data-dir="right">→</button>`;
             container.querySelectorAll('.mobile-btn').forEach(btn => {
-                const handler = () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput(btn.dataset.dir);
-                    }
-                };
-                btn.addEventListener('mousedown', handler);
-                btn.addEventListener('touchstart', (e) => { e.preventDefault(); handler(); });
-                btn.addEventListener('mouseup', () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput('stop');
-                    }
-                });
-                btn.addEventListener('touchend', (e) => { e.preventDefault();
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput('stop');
-                    }
-                });
+                const h = () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); };
+                btn.addEventListener('mousedown', h); btn.addEventListener('touchstart', (e) => { e.preventDefault(); h(); });
+                const s = () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput('stop'); };
+                btn.addEventListener('mouseup', s); btn.addEventListener('touchend', (e) => { e.preventDefault(); s(); });
             });
         } else if (gameId === 'shooter') {
             container.style.display = 'flex';
-            container.innerHTML = `
-                <button class="mobile-btn" data-dir="left">←</button>
-                <button class="mobile-btn" data-dir="fire">🔥</button>
-                <button class="mobile-btn" data-dir="right">→</button>
-            `;
+            container.innerHTML = `<button class="mobile-btn" data-dir="left">←</button><button class="mobile-btn" data-dir="fire">🔥</button><button class="mobile-btn" data-dir="right">→</button>`;
             container.querySelectorAll('.mobile-btn').forEach(btn => {
-                const handler = () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput(btn.dataset.dir);
-                    }
-                };
-                btn.addEventListener('click', handler);
-                btn.addEventListener('touchstart', (e) => { e.preventDefault(); handler(); });
+                const h = () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); };
+                btn.addEventListener('click', h); btn.addEventListener('touchstart', (e) => { e.preventDefault(); h(); });
             });
         } else if (gameId === 'game2048') {
             container.style.display = 'flex';
-            container.innerHTML = `
-                <div style="display:grid;grid-template-columns:64px 64px 64px;gap:4px">
-                    <div></div>
-                    <button class="mobile-btn" data-dir="up">↑</button>
-                    <div></div>
-                    <button class="mobile-btn" data-dir="left">←</button>
-                    <button class="mobile-btn" data-dir="down">↓</button>
-                    <button class="mobile-btn" data-dir="right">→</button>
-                </div>
-            `;
-            container.querySelectorAll('.mobile-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput(btn.dataset.dir);
-                    }
-                });
-            });
+            container.innerHTML = `<div style="display:grid;grid-template-columns:64px 64px 64px;gap:4px"><div></div><button class="mobile-btn" data-dir="up">↑</button><div></div><button class="mobile-btn" data-dir="left">←</button><button class="mobile-btn" data-dir="down">↓</button><button class="mobile-btn" data-dir="right">→</button></div>`;
+            container.querySelectorAll('.mobile-btn').forEach(btn => btn.addEventListener('click', () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); }));
         } else if (gameId === 'runner') {
             container.style.display = 'flex';
-            container.innerHTML = `
-                <button class="mobile-btn" data-dir="left">←</button>
-                <button class="mobile-btn" data-dir="up" style="background:rgba(46,213,115,0.3);border-color:#2ed573">⬆ 跳</button>
-                <button class="mobile-btn" data-dir="right">→</button>
-                <button class="mobile-btn" data-dir="down">⬇</button>
-            `;
+            container.innerHTML = `<button class="mobile-btn" data-dir="left">←</button><button class="mobile-btn" data-dir="up" style="background:rgba(46,213,115,0.3);border-color:#2ed573">⬆ 跳</button><button class="mobile-btn" data-dir="right">→</button><button class="mobile-btn" data-dir="down">⬇</button>`;
             container.querySelectorAll('.mobile-btn').forEach(btn => {
-                const dir = btn.dataset.dir;
-                const handler = () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput(dir);
-                    }
-                };
-                btn.addEventListener('click', handler);
-                btn.addEventListener('touchstart', (e) => { e.preventDefault(); handler(); });
+                btn.addEventListener('click', () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); });
+                btn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); });
             });
         } else if (gameId === 'tetris') {
             container.style.display = 'flex';
-            container.innerHTML = `
-                <div style="display:grid;grid-template-columns:64px 64px 64px;gap:4px">
-                    <button class="mobile-btn" data-dir="rotate">↻</button>
-                    <button class="mobile-btn" data-dir="up">↑</button>
-                    <div></div>
-                    <button class="mobile-btn" data-dir="left">←</button>
-                    <button class="mobile-btn" data-dir="down">↓</button>
-                    <button class="mobile-btn" data-dir="right">→</button>
-                    <div></div>
-                    <button class="mobile-btn" data-dir="drop">⬇</button>
-                    <div></div>
-                </div>
-            `;
-            container.querySelectorAll('.mobile-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    if (this.gameInstance && this.gameInstance.handleInput) {
-                        this.gameInstance.handleInput(btn.dataset.dir);
-                    }
-                });
-            });
+            container.innerHTML = `<div style="display:grid;grid-template-columns:64px 64px 64px;gap:4px"><button class="mobile-btn" data-dir="rotate">↻</button><button class="mobile-btn" data-dir="up">↑</button><div></div><button class="mobile-btn" data-dir="left">←</button><button class="mobile-btn" data-dir="down">↓</button><button class="mobile-btn" data-dir="right">→</button><div></div><button class="mobile-btn" data-dir="drop">⬇</button><div></div></div>`;
+            container.querySelectorAll('.mobile-btn').forEach(btn => btn.addEventListener('click', () => { if (this.gameInstance?.handleInput) this.gameInstance.handleInput(btn.dataset.dir); }));
         }
     }
 }
 
-// 所有游戏实例的全局注册表（必须在游戏脚本之前声明）
 const gameInstances = {};
 const gamesManager = new GamesManager();

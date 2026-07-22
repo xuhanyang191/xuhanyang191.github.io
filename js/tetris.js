@@ -15,7 +15,7 @@ class TetrisGame {
         this.gameOver = false;
 
         this.cols = 10;
-        this.rows = 20;
+        this.rows = 12;
         this.cellSize = canvas.width / (this.cols + 2); // 留边显示预览
 
         // 使用实际canvas宽度计算
